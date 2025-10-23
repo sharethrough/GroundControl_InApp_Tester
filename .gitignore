@@ -1,0 +1,89 @@
+# macOS system files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Thumbnails
+._*
+
+# Icon must end with two \r
+Icon
+
+# Files that might appear on external disk
+.Spotlight-V100
+.Trashes
+
+# =============================
+# Xcode / iOS / Swift Project
+# =============================
+# Build products & intermediates
+build/
+DerivedData/
+
+# Xcode user-specific data
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+xcuserdata/
+*.xcuserstate
+
+# Schemes: keep shared, ignore user-specific
+**/xcuserdata/**
+
+# Swift Package Manager
+.swiftpm/
+Packages/
+.build/
+
+# CocoaPods (if ever used)
+Pods/
+
+# Carthage
+Carthage/Build/
+
+# Fastlane
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# Archives & results
+*.xcarchive
+*.xcresult
+
+# Crash & analytics reports
+*.crash
+
+# Coverage & profiling
+*.profdata
+
+# Logs & temporary
+*.log
+*.tmp
+
+# Asset catalogs build artifacts (intermediate compiled forms)
+*.car
+
+# SwiftLint / formatter caches
+.swiftlint*
+\.swiftformat-temp*
+
+# Playground timeline & workspace autosave
+timeline.xctimeline
+playground.xcworkspace
+
+# Generated documentation
+docs/generated/
+
+# Ignore any local environment files
+.env.local
+.env.*.local
+
+# VS Code workspace settings (optional - keep if sharing)
+.vscode/
+
+# Git merge / rebase junk
+*.orig
+
+# End of file
