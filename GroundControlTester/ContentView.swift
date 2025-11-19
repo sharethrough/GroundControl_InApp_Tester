@@ -7,6 +7,10 @@
 
 import SwiftUI
 
+struct HTMLInputTarget: Hashable {}
+struct DV360Target: Hashable {}
+struct MRAIDTestTarget: Hashable {}
+
 struct PresetWebsite: Identifiable, Hashable {
     let id = UUID()
     let name: String
@@ -45,6 +49,18 @@ struct ContentView: View {
                 }
                 .disabled(formattedURL(from: customURLString) == nil)
             }
+            
+            Section(header: Text("Custom HTML")) {
+                NavigationLink("Load from HTML String", value: HTMLInputTarget())
+            }
+
+            Section(header: Text("DV360 SDK")) {
+                NavigationLink("DV360 Ad Rendering", value: DV360Target())
+            }
+
+            Section(header: Text("MRAID Testing")) {
+                NavigationLink("MRAID Detection Test", value: MRAIDTestTarget())
+            }
         }
         .toolbar {
                     ToolbarItem(placement: .principal) { // 'principal' centers it
@@ -77,6 +93,40 @@ struct ContentView: View {
             // For custom URLs, we display the URL string as the name
             let name = (url == equativURL) ? "Equativ" : url.absoluteString
             WebViewContainer(path: $path, url: url, displayName: name)
+        }
+        //  Receives an 'HTMLInputTarget' and shows the input page
+        .navigationDestination(for: HTMLInputTarget.self) { _ in
+            HTMLInputView(path: $path)
+        }
+                
+        //  Receives an 'HTMLPayload' and shows the web view
+        .navigationDestination(for: HTMLPayload.self) { payload in
+            HTMLWebViewContainer(path: $path, htmlString: payload.htmlString)
+        }
+
+        //  Receives a 'DV360Target' and shows the DV360 config view
+        .navigationDestination(for: DV360Target.self) { _ in
+            DV360ConfigView(path: $path)
+        }
+
+        //  Receives a 'DV360Config' and shows the DV360 web view with config
+        .navigationDestination(for: DV360Config.self) { config in
+            DV360WebViewContainer(path: $path, config: config)
+        }
+
+        //  Receives a 'MRAIDTestTarget' and shows the MRAID test page
+        .navigationDestination(for: MRAIDTestTarget.self) { _ in
+            MRAIDTestView(path: $path)
+        }
+
+        //  Receives a 'PasteAdTarget' and shows the paste ad HTML view
+        .navigationDestination(for: PasteAdTarget.self) { _ in
+            MRAIDAdTestView(path: $path)
+        }
+
+        //  Receives an 'AdHTMLPayload' and renders the ad with MRAID
+        .navigationDestination(for: AdHTMLPayload.self) { payload in
+            MRAIDAdRenderView(path: $path, adHTML: payload.htmlString)
         }
     }
     

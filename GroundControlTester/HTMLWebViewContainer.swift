@@ -1,17 +1,16 @@
 //
-//  WebViewContainer.swift
+//  HTMLWebViewContainer.swift
 //  GroundControlTester
 //
-//  Created by Shuhao Zhang on 2025-10-23.
+//  Created by Shuhao Zhang on 2025-10-21.
 //
 
 import SwiftUI
 
-struct WebViewContainer: View {
+struct HTMLWebViewContainer: View {
     @Binding var path: NavigationPath
 
-    let url: URL
-    let displayName: String
+    let htmlString: String
     private let equativURL = URL(string: "https://equativ.com/")!
 
     var body: some View {
@@ -21,23 +20,21 @@ struct WebViewContainer: View {
             HStack {
                 // --- 1. Back Button (Left) ---
                 Button(action: {
-                    path.removeLast(path.count)
+                    // Go back to the HTML Input View, not all the way home
+                    path.removeLast()
                 }) {
-                    Label("Home", systemImage: "house")
+                    Label("Back", systemImage: "chevron.left")
                         .font(.headline)
                 }
-                .padding(.leading) // Pin to the left edge
+                .padding(.leading)
 
                 // --- 2. Title (Center) ---
-                Spacer() // Pushes title away from the left button
+                Spacer()
                 
-                Text(displayName)
+                Text("Custom HTML")
                     .font(.headline)
-                    .lineLimit(1) // Don't let long names/URLs wrap
-                    .truncationMode(.middle) // Truncate in the middle
-                    .padding(.horizontal, 5) // Give it some breathing room
                 
-                Spacer() // Pushes title away from the right icon
+                Spacer()
                 
                 // --- 3. Icon (Right) ---
                 NavigationLink(value: equativURL) {
@@ -46,31 +43,35 @@ struct WebViewContainer: View {
                         .renderingMode(.template) // To color it white
                         .scaledToFit()
                         .frame(height: 10)
-                        .padding(.trailing) // Pin to the right edge
+                        .padding(.trailing)
                 }
             }
-            .padding(.vertical, 12) // Give the bar some height
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity)
             .background(Color.blue)
             .foregroundColor(.white)
             
-            // --- WebView (Unchanged) ---
-            WebView(loadType: .url(url))
-                .edgesIgnoringSafeArea(.bottom)
+            // --- WebView ---
+            // Here we use the .htmlString load type
+            // We provide a baseURL, which is CRITICAL for ad tags
+            // that need to fetch other resources (like images or scripts).
+            WebView(loadType: .htmlString(
+                htmlString,
+                baseURL: URL(string: "https://eqt-gc.rendering.sharethrough.com")
+            ))
+            .edgesIgnoringSafeArea(.bottom)
         }
-        // Hide the default navigation bar
         .navigationBarHidden(true)
         .navigationBarBackButtonHidden(true)
     }
 }
 
+
 #Preview {
-    // Updated preview to test long names
     NavigationStack {
-        WebViewContainer(
+        HTMLWebViewContainer(
             path: .constant(NavigationPath()),
-            url: URL(string: "https://a-very-long-url-example.com/with/lots/of/path/components")!,
-            displayName: "A Very Long Website Name or URL"
+            htmlString: "<h1>Hello World</h1>"
         )
     }
 }
