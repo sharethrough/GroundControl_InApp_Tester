@@ -86,10 +86,12 @@ struct MRAIDAdRenderView: View {
 
             // Ad rendering with MRAID enabled
             // Using Equativ/Sharethrough rendering domain as baseURL
+            // ID modifier keeps WebView stable and prevents Web Inspector disconnection
             WebView(loadType: .htmlString(
                 adHTML,
                 baseURL: URL(string: "https://eqt-gc.rendering.sharethrough.com")
             ), injectMRAID: true)
+            .id("mraid-webview-stable") // Stable ID prevents recreation
             .edgesIgnoringSafeArea(.bottom)
         }
         .navigationBarHidden(true)

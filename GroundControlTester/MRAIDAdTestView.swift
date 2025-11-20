@@ -64,6 +64,7 @@ struct MRAIDAdTestView: View {
     </html>
     """
 
+    @State private var showPreview: Bool = false
     @FocusState private var isEditorFocused: Bool
     private let equativURL = URL(string: "https://equativ.com/")!
 
@@ -199,111 +200,126 @@ struct MRAIDAdTestView: View {
             .background(Color.blue)
             .foregroundColor(.white)
 
-            // Content
+            // Content - Split view with input on top and preview below
             VStack(spacing: 0) {
-                // Text Editor for pasting HTML
-                TextEditor(text: $adHTML)
-                    .focused($isEditorFocused)
-                    .font(.body.monospaced())
-                    .autocapitalization(.none)
-                    .disableAutocorrection(true)
-                    .padding(8)
-                    .border(Color(UIColor.separator), width: 1)
-                    .padding()
+                // Text Editor for pasting HTML (collapsible)
+                VStack(spacing: 0) {
+                    // Header bar for HTML input section
+                    HStack {
+                        Text("Ad HTML Input")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
 
-                // Instructions and Example buttons
-                VStack(alignment: .leading, spacing: 12) {
-                    // Paste tip for simulator
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Image(systemName: "doc.on.clipboard")
-                                .foregroundColor(.orange)
-                            Text("Simulator Paste Tip:")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                        }
-                        Text("Click in text area → Edit menu → Paste (or ⌘V)")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.leading, 24)
-                    }
+                        Spacer()
 
-                    Divider()
-
-                    // Load example buttons
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Image(systemName: "lightbulb.fill")
-                                .foregroundColor(.blue)
-                            Text("Or Load Example Ad:")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                        }
-
-                        HStack(spacing: 10) {
-                            Button(action: {
-                                adHTML = exampleMRAIDAd
-                            }) {
-                                Label("MRAID Test (300x250)", systemImage: "rectangle.fill")
-                                    .font(.caption)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(Color.blue)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(6)
+                        Button(action: {
+                            withAnimation {
+                                showPreview.toggle()
                             }
-
-                            Button(action: {
-                                adHTML = exampleBannerAd
-                            }) {
-                                Label("Banner (320x50)", systemImage: "rectangle.fill")
-                                    .font(.caption)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(Color.green)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(6)
-                            }
+                        }) {
+                            Image(systemName: showPreview ? "chevron.up" : "chevron.down")
+                                .font(.caption)
                         }
                     }
+                    .padding(.horizontal)
+                    .padding(.vertical, 8)
+                    .background(Color(UIColor.secondarySystemBackground))
 
-                    Divider()
+                    if !showPreview {
+                        TextEditor(text: $adHTML)
+                            .focused($isEditorFocused)
+                            .font(.system(size: 12).monospaced())
+                            .autocapitalization(.none)
+                            .disableAutocorrection(true)
+                            .frame(height: 150)
+                            .padding(8)
+                            .border(Color(UIColor.separator), width: 1)
+                            .padding(.horizontal)
 
+                        // Instructions and Example buttons (compact)
+                        VStack(alignment: .leading, spacing: 8) {
+                            // Load example buttons
+                            HStack(spacing: 8) {
+                                Text("Examples:")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+
+                                Button(action: {
+                                    adHTML = exampleMRAIDAd
+                                }) {
+                                    Text("MRAID 300x250")
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.blue)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(4)
+                                }
+
+                                Button(action: {
+                                    adHTML = exampleBannerAd
+                                }) {
+                                    Text("Banner 320x50")
+                                        .font(.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.green)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(4)
+                                }
+                            }
+                        }
+                        .padding(.horizontal)
+                        .padding(.bottom, 8)
+                    }
+                }
+
+                Divider()
+
+                // Info banner
+                VStack(spacing: 6) {
                     HStack {
                         Image(systemName: "checkmark.circle.fill")
                             .foregroundColor(.green)
-                        Text("MRAID is injected automatically")
+                        Text("✅ MRAID 3.0 injected")
                             .font(.caption)
+                            .fontWeight(.medium)
+                        Spacer()
                     }
 
                     HStack {
-                        Image(systemName: "chart.bar.fill")
-                            .foregroundColor(.orange)
-                        Text("Check Xcode console for tracker logs")
-                            .font(.caption)
+                        Image(systemName: "terminal")
+                            .foregroundColor(.blue)
+                        Text("Check Xcode console for MRAID tracker logs")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                        Spacer()
                     }
                 }
                 .padding(.horizontal)
-                .padding(.bottom, 16)
+                .padding(.vertical, 8)
+                .background(Color(UIColor.systemBackground))
+                .overlay(
+                    Rectangle()
+                        .frame(height: 1)
+                        .foregroundColor(Color(UIColor.separator)),
+                    alignment: .bottom
+                )
 
-                // Render button
-                NavigationLink(value: AdHTMLPayload(htmlString: adHTML)) {
-                    Text("Render Ad & Test MRAID")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                }
-                .padding(.horizontal)
-
-                Spacer()
+                // Ad Preview (always visible, takes remaining space)
+                WebView(loadType: .htmlString(
+                    adHTML,
+                    baseURL: URL(string: "https://equativ.com")
+                ), injectMRAID: true)
+                .id("mraid-ad-preview-stable")
+                .edgesIgnoringSafeArea(.bottom)
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(isEditorFocused ? "Done" : "Edit") {
-                        isEditorFocused.toggle()
+                    if !showPreview {
+                        Button(isEditorFocused ? "Done" : "Edit") {
+                            isEditorFocused.toggle()
+                        }
                     }
                 }
             }

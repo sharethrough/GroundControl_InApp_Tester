@@ -37,13 +37,12 @@ struct WebView: UIViewRepresentable {
         configuration.allowsPictureInPictureMediaPlayback = true
 
         // Enable JavaScript (required for ads)
-        configuration.preferences.javaScriptEnabled = true
-        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
-
-        // Disable content blockers and tracking prevention for ads
         if #available(iOS 14.0, *) {
             configuration.defaultWebpagePreferences.allowsContentJavaScript = true
+        } else {
+            configuration.preferences.javaScriptEnabled = true
         }
+        configuration.preferences.javaScriptCanOpenWindowsAutomatically = true
 
         // Critical: Set limitsNavigationsToAppBoundDomains to false to allow third-party content
         if #available(iOS 14.0, *) {
@@ -53,6 +52,20 @@ struct WebView: UIViewRepresentable {
         // Disable tracking prevention (iOS 14+)
         if #available(iOS 14.5, *) {
             configuration.websiteDataStore = WKWebsiteDataStore.default()
+            // Disable Intelligent Tracking Prevention (ITP) for ad tracking
+            configuration.websiteDataStore.httpCookieStore.setCookie(HTTPCookie(properties: [
+                .domain: ".google.com",
+                .path: "/",
+                .name: "test_cookie",
+                .value: "1",
+                .secure: "TRUE"
+            ])!)
+        }
+
+        // Critical: Disable ITP completely for iOS 17+
+        if #available(iOS 17.0, *) {
+            configuration.preferences.isElementFullscreenEnabled = true
+            configuration.preferences.isFraudulentWebsiteWarningEnabled = false
         }
 
         // Allow all cross-origin requests (for tracking pixels)
@@ -88,9 +101,12 @@ struct WebView: UIViewRepresentable {
             webView.isInspectable = true
         }
 
-        // Allow all content
+        // Allow all content and disable security restrictions for ad tracking
         webView.configuration.preferences.setValue(true, forKey: "allowFileAccessFromFileURLs")
         webView.configuration.setValue(true, forKey: "allowUniversalAccessFromFileURLs")
+
+        // Set mobile content mode for proper ad rendering
+        webView.configuration.defaultWebpagePreferences.preferredContentMode = .mobile
 
         // Set a realistic mobile browser user agent (matches real iOS Safari for ad compatibility)
         let osVersion = ProcessInfo.processInfo.operatingSystemVersion
@@ -103,6 +119,24 @@ struct WebView: UIViewRepresentable {
     
     func updateUIView(_ webView: WKWebView, context: Context) {
         /// ✅ The update logic now switches on 'loadType'
+        /// Only reload if content has actually changed to keep Web Inspector connected
+        let contentIdentifier: String
+        switch loadType {
+        case .url(let url):
+            contentIdentifier = "url:\(url.absoluteString)"
+        case .htmlString(let html, let baseURL):
+            contentIdentifier = "html:\(html.hashValue):\(baseURL?.absoluteString ?? "")"
+        }
+
+        // Skip reload if content hasn't changed (prevents Web Inspector disconnection)
+        if context.coordinator.lastLoadedContent == contentIdentifier {
+            print("⏭️ Skipping reload - content unchanged (keeps Web Inspector connected)")
+            return
+        }
+
+        context.coordinator.lastLoadedContent = contentIdentifier
+        print("🔄 Loading new content into WebView")
+
         switch loadType {
         case .url(let url):
             var request = URLRequest(url: url)
@@ -189,6 +223,7 @@ struct WebView: UIViewRepresentable {
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var injectMRAID: Bool = true
         var mraidBridge: MRAIDBridge?
+        var lastLoadedContent: String?  // Track what was last loaded to prevent unnecessary reloads
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "consoleLog" {
@@ -270,10 +305,19 @@ struct WebView: UIViewRepresentable {
                 var OriginalImage = window.Image;
                 window.Image = function() {
                     var img = new OriginalImage();
+
+                    // Track load success/failure
+                    img.addEventListener('load', function() {
+                        console.log('✅ [Image Success] ' + this.src);
+                    });
+                    img.addEventListener('error', function() {
+                        console.error('❌ [Image Failed] ' + this.src);
+                    });
+
                     var originalSrcSetter = Object.getOwnPropertyDescriptor(HTMLImageElement.prototype, 'src').set;
                     Object.defineProperty(img, 'src', {
                         set: function(value) {
-                            console.log('📷 [Image Load] ' + value);
+                            console.log('📷 [Image Load Attempt] ' + value);
                             originalSrcSetter.call(this, value);
                         },
                         get: function() {
@@ -283,19 +327,61 @@ struct WebView: UIViewRepresentable {
                     return img;
                 };
 
-                // Log fetch requests
+                // Also intercept img tags created via innerHTML
+                var imgProto = HTMLImageElement.prototype;
+                var originalImgSrcSetter = Object.getOwnPropertyDescriptor(imgProto, 'src').set;
+                Object.defineProperty(imgProto, 'src', {
+                    set: function(value) {
+                        console.log('📷 [HTMLImageElement.src] ' + value);
+                        originalImgSrcSetter.call(this, value);
+
+                        // Add error/load handlers
+                        this.addEventListener('load', function() {
+                            console.log('✅ [Pixel Success] ' + value);
+                        });
+                        this.addEventListener('error', function() {
+                            console.error('❌ [Pixel Failed] ' + value);
+                        });
+                    },
+                    get: function() {
+                        return originalImgSrcSetter ? this.getAttribute('src') : null;
+                    }
+                });
+
+                // Log fetch requests with success/failure
                 if (window.fetch) {
                     var originalFetch = window.fetch;
                     window.fetch = function() {
-                        console.log('🌐 [Fetch] ' + arguments[0]);
-                        return originalFetch.apply(this, arguments);
+                        var url = arguments[0];
+                        console.log('🌐 [Fetch Attempt] ' + url);
+                        return originalFetch.apply(this, arguments)
+                            .then(function(response) {
+                                console.log('✅ [Fetch Success] ' + url + ' (Status: ' + response.status + ')');
+                                return response;
+                            })
+                            .catch(function(error) {
+                                console.error('❌ [Fetch Failed] ' + url + ' (Error: ' + error.message + ')');
+                                throw error;
+                            });
                     };
                 }
 
-                // Log XMLHttpRequest
+                // Log XMLHttpRequest with success/failure
                 var originalOpen = XMLHttpRequest.prototype.open;
                 XMLHttpRequest.prototype.open = function(method, url) {
-                    console.log('🌐 [XHR] ' + method + ' ' + url);
+                    console.log('🌐 [XHR Attempt] ' + method + ' ' + url);
+
+                    // Track completion
+                    this.addEventListener('load', function() {
+                        console.log('✅ [XHR Success] ' + method + ' ' + url + ' (Status: ' + this.status + ')');
+                    });
+                    this.addEventListener('error', function() {
+                        console.error('❌ [XHR Failed] ' + method + ' ' + url);
+                    });
+                    this.addEventListener('abort', function() {
+                        console.error('⚠️ [XHR Aborted] ' + method + ' ' + url);
+                    });
+
                     return originalOpen.apply(this, arguments);
                 };
 
@@ -396,22 +482,31 @@ struct WebView: UIViewRepresentable {
             if let httpResponse = navigationResponse.response as? HTTPURLResponse {
                 let urlString = httpResponse.url?.absoluteString ?? "unknown"
 
-                // Special logging for SmartAdServer
-                if urlString.contains("smartadserver.com") {
-                    print("✅ [SmartAdServer Response Received!]")
+                // Special logging for tracking pixels
+                if urlString.contains("smartadserver.com") || urlString.contains("gen_204") || urlString.contains("adtrafficquality") {
+                    let pixelType = urlString.contains("smartadserver.com") ? "SmartAdServer" :
+                                  urlString.contains("gen_204") ? "Google gen_204" : "AdTrafficQuality"
+
+                    if httpResponse.statusCode >= 200 && httpResponse.statusCode < 300 {
+                        print("✅ [\(pixelType) Success!]")
+                    } else {
+                        print("⚠️ [\(pixelType) Unexpected Status!]")
+                    }
                     print("   Status: \(httpResponse.statusCode)")
                     print("   URL: \(urlString)")
                     print("   Headers: \(httpResponse.allHeaderFields)")
+                    print("   MIME Type: \(httpResponse.mimeType ?? "none")")
                 } else {
                     print("📡 [Navigation Response] Status: \(httpResponse.statusCode), URL: \(urlString)")
                 }
             } else {
                 // No HTTP response - might be blocked or failed
                 let urlString = navigationResponse.response.url?.absoluteString ?? "unknown"
-                if urlString.contains("smartadserver.com") {
-                    print("❌ [SmartAdServer] No HTTP response (likely blocked)")
+                if urlString.contains("smartadserver.com") || urlString.contains("gen_204") || urlString.contains("adtrafficquality") {
+                    print("❌ [Pixel Blocked] No HTTP response")
                     print("   URL: \(urlString)")
                     print("   Response type: \(type(of: navigationResponse.response))")
+                    print("   Can show MIME type: \(navigationResponse.canShowMIMEType)")
                 }
             }
             decisionHandler(.allow)
