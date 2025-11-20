@@ -23,9 +23,13 @@ struct WebView: UIViewRepresentable {
     /// Enable MRAID injection (default: true for all ad-serving contexts)
     let injectMRAID: Bool
 
-    init(loadType: LoadType, injectMRAID: Bool = true) {
+    /// Force reload trigger - change this to force a reload without recreating the WebView
+    let forceReload: UUID?
+
+    init(loadType: LoadType, injectMRAID: Bool = true, forceReload: UUID? = nil) {
         self.loadType = loadType
         self.injectMRAID = injectMRAID
+        self.forceReload = forceReload
     }
 
     func makeUIView(context: Context) -> WKWebView {
@@ -119,7 +123,7 @@ struct WebView: UIViewRepresentable {
     
     func updateUIView(_ webView: WKWebView, context: Context) {
         /// ✅ The update logic now switches on 'loadType'
-        /// Only reload if content has actually changed to keep Web Inspector connected
+        /// Only reload if content has actually changed OR forceReload is triggered
         let contentIdentifier: String
         switch loadType {
         case .url(let url):
@@ -128,14 +132,20 @@ struct WebView: UIViewRepresentable {
             contentIdentifier = "html:\(html.hashValue):\(baseURL?.absoluteString ?? "")"
         }
 
-        // Skip reload if content hasn't changed (prevents Web Inspector disconnection)
-        if context.coordinator.lastLoadedContent == contentIdentifier {
+        // Check if force reload is triggered
+        let shouldForceReload = forceReload != nil && forceReload != context.coordinator.lastForceReload
+
+        if shouldForceReload {
+            context.coordinator.lastForceReload = forceReload
+            print("🔄 Force reload triggered - reloading same content (keeps Web Inspector connected)")
+        } else if context.coordinator.lastLoadedContent == contentIdentifier {
+            // Skip reload if content hasn't changed and no force reload
             print("⏭️ Skipping reload - content unchanged (keeps Web Inspector connected)")
             return
         }
 
         context.coordinator.lastLoadedContent = contentIdentifier
-        print("🔄 Loading new content into WebView")
+        print("🔄 Loading content into WebView")
 
         switch loadType {
         case .url(let url):
@@ -224,6 +234,7 @@ struct WebView: UIViewRepresentable {
         var injectMRAID: Bool = true
         var mraidBridge: MRAIDBridge?
         var lastLoadedContent: String?  // Track what was last loaded to prevent unnecessary reloads
+        var lastForceReload: UUID?  // Track force reload trigger
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "consoleLog" {

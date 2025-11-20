@@ -65,6 +65,7 @@ struct MRAIDAdTestView: View {
     """
 
     @State private var showPreview: Bool = false
+    @State private var reloadTrigger: UUID = UUID()  // Used to force reload
     @FocusState private var isEditorFocused: Bool
     private let equativURL = URL(string: "https://equativ.com/")!
 
@@ -185,6 +186,16 @@ struct MRAIDAdTestView: View {
                     .font(.headline)
 
                 Spacer()
+
+                // Reload button
+                Button(action: {
+                    reloadTrigger = UUID()  // Change ID to force WebView reload
+                    print("🔄 Force reloading WebView - new network requests will fire")
+                }) {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 16))
+                }
+                .padding(.trailing, 8)
 
                 NavigationLink(value: equativURL) {
                     Image("equativ")
@@ -307,11 +318,15 @@ struct MRAIDAdTestView: View {
                 )
 
                 // Ad Preview (always visible, takes remaining space)
-                WebView(loadType: .htmlString(
-                    adHTML,
-                    baseURL: URL(string: "https://equativ.com")
-                ), injectMRAID: true)
-                .id("mraid-ad-preview-stable")
+                WebView(
+                    loadType: .htmlString(
+                        adHTML,
+                        baseURL: URL(string: "https://equativ.com")
+                    ),
+                    injectMRAID: true,
+                    forceReload: reloadTrigger
+                )
+                .id("mraid-ad-preview-stable")  // Stable ID keeps Web Inspector connected
                 .edgesIgnoringSafeArea(.bottom)
             }
             .toolbar {
